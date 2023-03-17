@@ -53,12 +53,13 @@ class Matrix
 	}
 
 	public static int ToByte(double d)
-	{
-		var val = (int)d;
-		if (val > byte.MaxValue)
-			return byte.MaxValue;
-		if (val < byte.MinValue)
-			return byte.MinValue;
-		return val;
-	}
+    {
+        var val = (int)d;
+        return val switch
+        {
+            > byte.MaxValue => byte.MaxValue,
+            < byte.MinValue => byte.MinValue,
+            _ => val
+        };
+    }
 }

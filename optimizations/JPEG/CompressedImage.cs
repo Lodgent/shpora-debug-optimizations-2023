@@ -6,15 +6,15 @@ namespace JPEG;
 
 public class CompressedImage
 {
-	public int Width { get; set; }
-	public int Height { get; set; }
+    public int Width ;
+    public int Height;
 
-	public int Quality { get; set; }
-		
-	public Dictionary<BitsWithLength, byte> DecodeTable { get; set; }
+    public int Quality;
 
-	public long BitsCount { get; set; }
-	public byte[] CompressedBytes { get; set; }
+    public Dictionary<BitsWithLength, byte> DecodeTable;
+
+	public long BitsCount;
+	public byte[] CompressedBytes;
 
 	public void Save(string path)
 	{

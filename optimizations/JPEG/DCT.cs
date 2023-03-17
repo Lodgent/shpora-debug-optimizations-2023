@@ -1,65 +1,76 @@
 ﻿using System;
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+using JPEG.Images;
+using JPEG.Processor;
 using JPEG.Utilities;
 
 namespace JPEG;
 
 public class DCT
 {
-	public static double[,] DCT2D(double[,] input)
-	{
-		var height = input.GetLength(0);
-		var width = input.GetLength(1);
-		var coeffs = new double[width, height];
-        MathEx.LoopByTwoVariables(
-			0, width,
-			0, height,
-			(u, v) =>
-			{
-				var sum = MathEx
-					.SumByTwoVariables(
-						0, width,
-						0, height,
-						(x, y) => BasisFunction(input[x, y], u, v, x, y, height, width));
+    private const int DCTSize = JpegProcessor.DCTSize;
+    public static double[,] cos;
+    public static double[,] DCT2D(Pixel[,] input, Func<Pixel, double> selector, int xOffset, int yOffset,int shiftValue
+    )
+    {
+        var coeffs = new double[DCTSize, DCTSize];
+        FindCos();
+        for (var u = 0; u < DCTSize; u++)
+        for (var v = 0; v < DCTSize; v++)
+        {
+            MathSum(input, selector, xOffset, yOffset, shiftValue, u, v, coeffs);
+        }
+        return coeffs;
+    }
 
-				coeffs[u, v] = sum * Beta(height, width) * Alpha(u) * Alpha(v);
-			});
+    private static void MathSum(Pixel[,] input, Func<Pixel, double> selector, int xOffset, int yOffset, int shiftValue, int u, int v,
+        double[,] coeffs)
+    {
+        double sum = 0;
+        for (var x = 0; x < DCTSize; x++)
+        for (var y = 0; y < DCTSize; y++)
+            sum += (selector(input[x + xOffset, y + yOffset]) + shiftValue) * cos[x, u] * cos[y, v];
+        coeffs[u, v] = sum * Beta(DCTSize, DCTSize) * Alpha(u) * Alpha(v);
+    }
 
-		return coeffs;
-	}
+    public static void IDCT2D(
+        double[,] coeffs,
+        double[,] output,
+        int iOffset,
+        int jOffset)
+    {
+        FindCos();
+        for (var i = 0; i < DCTSize; i++)
+        for (var j = 0; j < DCTSize; j++)
+        {
+            double sum = 0;
+            for (var u = 0; u < DCTSize; u++)
+            for (var v = 0; v < DCTSize; v++)
+                sum += coeffs[u, v] * cos[i, u] * cos[j, v] * Alpha(u) * Alpha(v);
 
-	public static void IDCT2D(double[,] coeffs, double[,] output)
-	{
-		for (var x = 0; x < coeffs.GetLength(1); x++)
-		{
-			for (var y = 0; y < coeffs.GetLength(0); y++)
-			{
-				var sum = MathEx
-					.SumByTwoVariables(
-						0, coeffs.GetLength(1),
-						0, coeffs.GetLength(0),
-						(u, v) =>
-							BasisFunction(coeffs[u, v], u, v, x, y, coeffs.GetLength(0), coeffs.GetLength(1)) *
-							Alpha(u) * Alpha(v));
+            output[i + iOffset, j + jOffset] = sum * beta + 128;
+        }
+    }
 
-				output[x, y] = sum * Beta(coeffs.GetLength(0), coeffs.GetLength(1));
-			}
-		}
-	}
+    private static double beta = 1.0 / DCTSize + 1.0 / DCTSize;
+    private static double AlphaS = 1 / Math.Sqrt(2);
+    private static double Alpha(int u)
+    {
+        if (u == 0)
+            return AlphaS;
+        return 1;
+    }
 
-	public static double BasisFunction(double a, double u, double v, double x, double y, int height, int width)
-	{
-		return a * Math.Cos(((2d * x + 1d) * u * Math.PI) / (2 * width)) * Math.Cos(((2d * y + 1d) * v * Math.PI) / (2 * height));
-	}
-
-	private static double Alpha(int u)
-	{
-		if (u == 0)
-			return 1 / Math.Sqrt(2);
-		return 1;
-	}
-
-	private static double Beta(int height, int width)
-	{
-		return 1d / width + 1d / height;
-	}
+    private static double Beta(int height, int width)
+    {
+        return 1d / width + 1d / height;
+    }
+    private static void FindCos()
+    {
+        cos = new double[DCTSize, DCTSize];
+        for (var i = 0; i < DCTSize; i++)
+        for (var j = 0; j < DCTSize; j++)
+            cos[i, j] = Math.Cos((2 * i + 1) * j * Math.PI / (2 * DCTSize));
+    }
 }

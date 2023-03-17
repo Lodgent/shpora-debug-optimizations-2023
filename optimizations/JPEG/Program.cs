@@ -7,8 +7,8 @@ namespace JPEG;
 internal class Program
 {
 	static void Main(string[] args)
-	{
-        Console.WriteLine(IntPtr.Size == 8 ? "64-bit version" : "32-bit version");
+	{ 
+			Console.WriteLine(IntPtr.Size == 8 ? "64-bit version" : "32-bit version");
 			var processor = JpegProcessor.Init;
 			var sw = Stopwatch.StartNew();
 			var imagePath = @"sample.bmp";
@@ -27,7 +27,6 @@ internal class Program
 			Console.WriteLine("Decompression: " + sw.ElapsedMilliseconds);
 			Console.WriteLine($"Peak commit size: {MemoryMeter.PeakPrivateBytes() / (1024.0 * 1024):F2} MB");
 			Console.WriteLine($"Peak working set: {MemoryMeter.PeakWorkingSet() / (1024.0 * 1024):F2} MB");
-		 
 		 
 	}
 }
