@@ -10,8 +10,7 @@ public class DCT
 		var height = input.GetLength(0);
 		var width = input.GetLength(1);
 		var coeffs = new double[width, height];
-
-		MathEx.LoopByTwoVariables(
+        MathEx.LoopByTwoVariables(
 			0, width,
 			0, height,
 			(u, v) =>
@@ -49,10 +48,7 @@ public class DCT
 
 	public static double BasisFunction(double a, double u, double v, double x, double y, int height, int width)
 	{
-		var b = Math.Cos(((2d * x + 1d) * u * Math.PI) / (2 * width));
-		var c = Math.Cos(((2d * y + 1d) * v * Math.PI) / (2 * height));
-
-		return a * b * c;
+		return a * Math.Cos(((2d * x + 1d) * u * Math.PI) / (2 * width)) * Math.Cos(((2d * y + 1d) * v * Math.PI) / (2 * height));
 	}
 
 	private static double Alpha(int u)

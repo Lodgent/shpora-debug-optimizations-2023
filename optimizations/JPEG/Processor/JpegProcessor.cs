@@ -39,10 +39,12 @@ public class JpegProcessor : IJpegProcessor
 		for (var y = 0; y < matrix.Height; y += DCTSize)
 		{
 			for (var x = 0; x < matrix.Width; x += DCTSize)
-			{
-				foreach (var selector in new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr })
-				{
-					var subMatrix = GetSubMatrix(matrix, y, DCTSize, x, DCTSize, selector);
+            {
+                var pixelFunc = new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr };
+				foreach (var selector in pixelFunc)
+                {
+					
+                    var subMatrix = GetSubMatrix(matrix, y, DCTSize, x, DCTSize, selector);
 					ShiftMatrixValues(subMatrix, -128);
 					var channelFreqs = DCT.DCT2D(subMatrix);
 					var quantizedFreqs = Quantize(channelFreqs, quality);
@@ -85,8 +87,7 @@ public class JpegProcessor : IJpegProcessor
 						DCT.IDCT2D(channelFreqs, channel);
 						ShiftMatrixValues(channel, 128);
 					}
-
-					SetPixels(result, _y, cb, cr, PixelFormat.YCbCr, y, x);
+                    SetPixels(result, _y, cb, cr, y, x);
 				}
 			}
 		}
@@ -101,18 +102,21 @@ public class JpegProcessor : IJpegProcessor
 
 		for (var y = 0; y < height; y++)
 		for (var x = 0; x < width; x++)
-			subMatrix[y, x] = subMatrix[y, x] + shiftValue;
+			subMatrix[y, x] += shiftValue;
 	}
 
-	private static void SetPixels(Matrix matrix, double[,] a, double[,] b, double[,] c, PixelFormat format,
+	private static void SetPixels(Matrix matrix, double[,] a, double[,] b, double[,] c,
 		int yOffset, int xOffset)
 	{
 		var height = a.GetLength(0);
 		var width = a.GetLength(1);
 
 		for (var y = 0; y < height; y++)
-		for (var x = 0; x < width; x++)
-			matrix.Pixels[yOffset + y, xOffset + x] = new Pixel(a[y, x], b[y, x], c[y, x], format);
+        for (var x = 0; x < width; x++)
+        {
+            matrix.Pixels[yOffset + y, xOffset + x].SetPixelYCbCr(a[y, x], b[y, x], c[y, x]);
+        }
+			
 	}
 
 	private static double[,] GetSubMatrix(Matrix matrix, int yOffset, int yLength, int xOffset, int xLength,
