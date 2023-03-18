@@ -4,6 +4,7 @@ namespace JPEG.Images;
 
 class Matrix
 {
+
 	public readonly Pixel[,] Pixels;
 	public readonly int Height;
 	public readonly int Width;
@@ -14,8 +15,8 @@ class Matrix
 		Width = width;
 
 		Pixels = new Pixel[height, width];
-		for (var i = 0; i < height; ++i)
-        for (var j = 0; j < width; ++j)
+		for (var i = 0; i < height; i++)
+        for (var j = 0; j < width; j++)
             Pixels[i, j] = new Pixel();
 	}
 

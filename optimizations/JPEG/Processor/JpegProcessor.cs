@@ -35,7 +35,6 @@ public class JpegProcessor : IJpegProcessor
     private static CompressedImage Compress(Matrix matrix, int quality = 50)
     {
         var allQuantizedBytes = new List<byte>();
-
         for (var y = 0; y < matrix.Height; y += DCTSize)
         for (var x = 0; x < matrix.Width; x += DCTSize)
             foreach (var selector in new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr })
@@ -47,35 +46,28 @@ public class JpegProcessor : IJpegProcessor
 
         return new CompressedImage
         {
-            Quality = quality,
-            CompressedBytes = compressedBytes,
-            BitsCount = bitsCount,
-            DecodeTable = decodeTable,
-            Height = matrix.Height,
-            Width = matrix.Width
+            Quality = quality, CompressedBytes = compressedBytes, BitsCount = bitsCount, DecodeTable = decodeTable, Height = matrix.Height, Width = matrix.Width
         };
     }
 
     private static Matrix Uncompress(CompressedImage image)
     {
         var result = new Matrix(image.Height, image.Width);
-        using (var allQuantizedBytes =
-               new MemoryStream(HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount)))
-        {
-            var _y = new double[image.Height, image.Width];
-            var cb = new double[image.Height, image.Width];
-            var cr = new double[image.Height, image.Width];
-            for (var y = 0; y < image.Height; y += DCTSize)
-            for (var x = 0; x < image.Width; x += DCTSize)
-                foreach (var channel in new[] { _y, cb, cr })
-                {
-                    var quantizedBytes = new byte[DCTSize * DCTSize];
-                    allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
-                    DCT.IDCT2D(DeQuantize(ZigZagUnScan(quantizedBytes), image.Quality), channel, y, x);
-                }
+        using var allQuantizedBytes =
+            new MemoryStream(HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount));
+        var _y = new double[image.Height, image.Width];
+        var cb = new double[image.Height, image.Width];
+        var cr = new double[image.Height, image.Width];
+        for (var y = 0; y < image.Height; y += DCTSize)
+        for (var x = 0; x < image.Width; x += DCTSize)
+            foreach (var channel in new[] { _y, cb, cr })
+            {
+                var quantizedBytes = new byte[DCTSize * DCTSize];
+                allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
+                DCT.IDCT2D(DeQuantize(ZigZagUnScan(quantizedBytes), image.Quality), channel, y, x);
+            }
 
-            SetPixels(result, _y, cb, cr);
-        }
+        SetPixels(result, _y, cb, cr);
         return result;
     }
 
@@ -168,19 +160,12 @@ public class JpegProcessor : IJpegProcessor
 
     private static double[,] DeQuantize(byte[,] quantizedBytes, int quality)
     {
-        var result = new double[quantizedBytes.GetLength(0), quantizedBytes.GetLength(1)];
+        var result = new double[DCTSize, DCTSize];
         var quantizationMatrix = GetQuantizationMatrix(quality);
 
-        for (int y = 0; y < quantizedBytes.GetLength(0); y++)
-        {
-            for (int x = 0; x < quantizedBytes.GetLength(1); x++)
-            {
-                result[y, x] =
-                    ((sbyte)quantizedBytes[y, x]) *
-                    quantizationMatrix[y, x];  
-            }
-        }
-
+        for (var y = 0; y < DCTSize; y++)
+        for (var x = 0; x < DCTSize; x++)
+                result[y, x] = (sbyte)quantizedBytes[y, x] * quantizationMatrix[y, x];
         return result;
     }
 
@@ -198,9 +183,9 @@ public class JpegProcessor : IJpegProcessor
             { 49, 64, 78, 87, 103, 121, 120, 101 },
             { 72, 92, 95, 98, 112, 100, 103, 99 }
         };
-        for (int y = 0; y < result.GetLength(0); y++)
+        for (var y = 0; y < DCTSize; y++)
         {
-            for (int x = 0; x < result.GetLength(1); x++)
+            for (var x = 0; x < DCTSize; x++)
             {
                 result[y, x] = (multiplier * result[y, x] + 50) / 100;
             }

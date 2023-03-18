@@ -9,15 +9,15 @@ namespace JPEG;
 
 public class DCT
 {
-    private const int DCTSize = JpegProcessor.DCTSize;
-    public static double[,] cos;
+    private const int Size = JpegProcessor.DCTSize;
+    public static double[,] Cos;
     public static double[,] DCT2D(Pixel[,] input, Func<Pixel, double> selector, int xOffset, int yOffset,int shiftValue
     )
     {
-        var coeffs = new double[DCTSize, DCTSize];
+        var coeffs = new double[Size, Size];
         FindCos();
-        for (var u = 0; u < DCTSize; u++)
-        for (var v = 0; v < DCTSize; v++)
+        for (var u = 0; u < Size; u++)
+        for (var v = 0; v < Size; v++)
         {
             MathSum(input, selector, xOffset, yOffset, shiftValue, u, v, coeffs);
         }
@@ -28,10 +28,10 @@ public class DCT
         double[,] coeffs)
     {
         double sum = 0;
-        for (var x = 0; x < DCTSize; x++)
-        for (var y = 0; y < DCTSize; y++)
-            sum += (selector(input[x + xOffset, y + yOffset]) + shiftValue) * cos[x, u] * cos[y, v];
-        coeffs[u, v] = sum * Beta(DCTSize, DCTSize) * Alpha(u) * Alpha(v);
+        for (var i = 0; i < Size; i++)
+        for (var j = 0; j < Size; j++)
+            sum += (selector(input[i + xOffset, j + yOffset]) + shiftValue) * Cos[i, u] * Cos[j, v];
+        coeffs[u, v] = sum * Beta(Size, Size) * Alpha(u) * Alpha(v);
     }
 
     public static void IDCT2D(
@@ -41,36 +41,35 @@ public class DCT
         int jOffset)
     {
         FindCos();
-        for (var i = 0; i < DCTSize; i++)
-        for (var j = 0; j < DCTSize; j++)
+        for (var i = 0; i < Size; i++)
+        for (var j = 0; j < Size; j++)
         {
             double sum = 0;
-            for (var u = 0; u < DCTSize; u++)
-            for (var v = 0; v < DCTSize; v++)
-                sum += coeffs[u, v] * cos[i, u] * cos[j, v] * Alpha(u) * Alpha(v);
+            for (var u = 0; u < Size; u++)
+            for (var v = 0; v < Size; v++)
+                sum += coeffs[u, v] * Cos[i, u] * Cos[j, v] * Alpha(u) * Alpha(v);
 
             output[i + iOffset, j + jOffset] = sum * beta + 128;
         }
     }
 
-    private static double beta = 1.0 / DCTSize + 1.0 / DCTSize;
+    private static double beta = 1.0 / Size + 1.0 / Size;
     private static double AlphaS = 1 / Math.Sqrt(2);
+    
+    private static void FindCos()
+    {
+        Cos = new double[Size, Size];
+        for (var i = 0; i < Size; i++)
+        for (var j = 0; j < Size; j++)
+            Cos[i, j] = Math.Cos((2 * i + 1) * j * Math.PI / (2 * Size));
+    }
     private static double Alpha(int u)
     {
-        if (u == 0)
-            return AlphaS;
-        return 1;
+        return u == 0 ? AlphaS : 1;
     }
 
     private static double Beta(int height, int width)
     {
         return 1d / width + 1d / height;
-    }
-    private static void FindCos()
-    {
-        cos = new double[DCTSize, DCTSize];
-        for (var i = 0; i < DCTSize; i++)
-        for (var j = 0; j < DCTSize; j++)
-            cos[i, j] = Math.Cos((2 * i + 1) * j * Math.PI / (2 * DCTSize));
     }
 }

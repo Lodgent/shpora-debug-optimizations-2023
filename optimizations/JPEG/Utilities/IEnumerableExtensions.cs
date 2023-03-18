@@ -13,7 +13,7 @@ static class IEnumerableExtensions
 
 	public static IEnumerable<T> Without<T>(this IEnumerable<T> enumerable, params T[] elements)
 	{
-		return enumerable.Where(x => !elements.Contains(x));
+        return enumerable.Where(x => !elements.Contains(x));
 	}
 
 	public static IEnumerable<T> ToEnumerable<T>(this T element)
