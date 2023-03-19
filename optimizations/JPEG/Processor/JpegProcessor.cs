@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading.Tasks;
 using JPEG.Images;
-using PixelFormat = JPEG.Images.PixelFormat;
+ 
 
 namespace JPEG.Processor;
 
@@ -17,30 +18,34 @@ public class JpegProcessor : IJpegProcessor
     public void Compress(string imagePath, string compressedImagePath)
     {
         using var fileStream = File.OpenRead(imagePath);
-        using var bmp = (Bitmap)Image.FromStream(fileStream, false, false);
-        var imageMatrix = (Matrix)bmp;
-        //Console.WriteLine($"{bmp.Width}x{bmp.Height} - {fileStream.Length / (1024.0 * 1024):F2} MB");
-        var compressionResult = Compress(imageMatrix, CompressionQuality);
-        compressionResult.Save(compressedImagePath);
+        Compress((Matrix)(Bitmap)Image.FromStream(fileStream, false, false), CompressionQuality).Save(compressedImagePath);
     }
 
     public void Uncompress(string compressedImagePath, string uncompressedImagePath)
     {
         var compressedImage = CompressedImage.Load(compressedImagePath);
-        var uncompressedImage = Uncompress(compressedImage);
-        var resultBmp = (Bitmap)uncompressedImage;
-        resultBmp.Save(uncompressedImagePath, ImageFormat.Bmp);
+        
+        ((Bitmap)Uncompress(compressedImage)).Save(uncompressedImagePath, ImageFormat.Bmp);
     }
 
     private static CompressedImage Compress(Matrix matrix, int quality = 50)
     {
-        var allQuantizedBytes = new List<byte>();
+        var allQuantizedBytes = new List<byte>(1600000);
+        var tList = new List<Task<byte[]>>();
         for (var y = 0; y < matrix.Height; y += DCTSize)
-        for (var x = 0; x < matrix.Width; x += DCTSize)
-            foreach (var selector in new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr })
-                allQuantizedBytes.AddRange(ZigZagScan(Quantize(DCT.DCT2D(matrix.Pixels, selector, y, x, -128),
-                    quality)));
+            for (var x = 0; x < matrix.Width; x += DCTSize) 
+                foreach (var selector in new Func<Pixel, double>[] { p => p.Y, p => p.Cb, p => p.Cr })
+                {
+                    var i = x; 
+                    var j=y;
+                    var select = selector;
+                    var t = new Task<byte[]>(()=> ZigZagScan(Quantize(DCT.DCT2D(matrix.Pixels, select, j, i), quality)));
+                    tList.Add(t);
+                    t.Start();
+                }
         long bitsCount;
+        foreach (var task in tList)
+            allQuantizedBytes.AddRange(task.Result);
         Dictionary<BitsWithLength, byte> decodeTable;
         var compressedBytes = HuffmanCodec.Encode(allQuantizedBytes, out decodeTable, out bitsCount);
 
@@ -50,24 +55,39 @@ public class JpegProcessor : IJpegProcessor
         };
     }
 
-    private static Matrix Uncompress(CompressedImage image)
+    private Matrix Uncompress(CompressedImage image)
     {
         var result = new Matrix(image.Height, image.Width);
-        using var allQuantizedBytes =
-            new MemoryStream(HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount));
-        var _y = new double[image.Height, image.Width];
-        var cb = new double[image.Height, image.Width];
-        var cr = new double[image.Height, image.Width];
-        for (var y = 0; y < image.Height; y += DCTSize)
-        for (var x = 0; x < image.Width; x += DCTSize)
-            foreach (var channel in new[] { _y, cb, cr })
+        using (var allQuantizedBytes =
+               new MemoryStream(HuffmanCodec.Decode(image.CompressedBytes, image.DecodeTable, image.BitsCount)))
+        {
+            var _y = new double[result.Height, result.Width];
+            var cb = new double[result.Height, result.Width];
+            var cr = new double[result.Height, result.Width];
+            var tasks = new List<Task>();
+
+            for (var y = 0; y < image.Height; y += DCTSize)
             {
-                var quantizedBytes = new byte[DCTSize * DCTSize];
-                allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
-                DCT.IDCT2D(DeQuantize(ZigZagUnScan(quantizedBytes), image.Quality), channel, y, x);
+                for (var x = 0; x < image.Width; x += DCTSize)
+                {
+                    foreach (var channel in new[] { _y, cb, cr })
+                    {
+                        var quantizedBytes = new byte[DCTSize * DCTSize];
+                        allQuantizedBytes.ReadAsync(quantizedBytes, 0, quantizedBytes.Length).Wait();
+                        var y1 = y;
+                        var x1 = x;
+                        var task = new Task(() => { DCT.IDCT2D(DeQuantize(ZigZagUnScan(quantizedBytes), image.Quality), channel, y1, x1); }
+                        );
+                        tasks.Add(task);
+                        task.Start();
+                    }
+                }
             }
 
-        SetPixels(result, _y, cb, cr);
+            Task.WaitAll(tasks.ToArray());
+            SetPixels(result, _y, cb, cr);
+        }
+
         return result;
     }
 
@@ -81,7 +101,7 @@ public class JpegProcessor : IJpegProcessor
     }
 
 
-    private static IEnumerable<byte> ZigZagScan(byte[,] channelFreqs)
+    private static byte[] ZigZagScan(byte[,] channelFreqs)
     {
         return new[]
         {
